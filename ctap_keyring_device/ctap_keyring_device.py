@@ -7,6 +7,17 @@ from types import FunctionType
 from typing import List, Optional
 
 import keyring
+from keyring.backends import OS_X
+import platform
+system = platform.system()
+if  system == 'Darwin':
+    keyring.set_keyring(OS_X.Keyring())
+elif system == 'Windows':
+    keyring.set_keyring(Windows.WinVaultKeyring())
+else:
+    pass # rely on autodiscovery for other platforms
+
+import keyring
 from cryptography.hazmat.primitives import serialization
 from fido2 import cose, cbor
 from fido2 import ctap
@@ -121,6 +132,8 @@ class CtapKeyringDevice(ctap.CtapDevice):
         except CtapError as e:
             return self._wrap_err_code(e.code)
         except Exception:
+            import traceback
+            traceback.print_exc()
             return self._wrap_err_code(CtapError.ERR.OTHER)
 
     # noinspection PyUnusedLocal
@@ -149,9 +162,13 @@ class CtapKeyringDevice(ctap.CtapDevice):
         try:
             ctap2_req: dict = cbor.decode(data[1:])
         except Exception:
+            import traceback
+            traceback.print_exc()
             raise CtapError(CtapError.ERR.INVALID_CBOR)
 
         if not isinstance(ctap2_req, dict):
+            import traceback
+            traceback.print_exc()
             raise CtapError(CtapError.ERR.INVALID_CBOR)
 
         # noinspection PyArgumentList
@@ -222,6 +239,8 @@ class CtapKeyringDevice(ctap.CtapDevice):
             )
             return cred
         except Exception:
+            import traceback
+            traceback.print_exc()
             raise CtapError(CtapError.ERR.OTHER)
 
     def _make_attested_credential_data(
