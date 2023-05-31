@@ -156,9 +156,13 @@ class CtapKeyringDevice(ctap.CtapDevice):
         try:
             ctap2_req: Mapping[Any, Any] = cbor.decode(data[1:])
         except Exception:
+            import traceback
+            traceback.print_exc()
             raise CtapError(CtapError.ERR.INVALID_CBOR)
 
         if not isinstance(ctap2_req, dict):
+            import traceback
+            traceback.print_exc()
             raise CtapError(CtapError.ERR.INVALID_CBOR)
 
         # noinspection PyArgumentList
@@ -229,6 +233,8 @@ class CtapKeyringDevice(ctap.CtapDevice):
             )
             return cred
         except Exception:
+            import traceback
+            traceback.print_exc()
             raise CtapError(CtapError.ERR.OTHER)
 
     def _make_attested_credential_data(
@@ -324,6 +330,8 @@ class CtapKeyringDevice(ctap.CtapDevice):
                 res.append(cred)
             except Exception:
                 # Best effort
+                import traceback
+                traceback.print_exc()
                 continue
 
         return res
