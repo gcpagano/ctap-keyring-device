@@ -74,7 +74,9 @@ class TestCtapKeyringDevice(unittest.TestCase):
             len(info.transports) == 1
             and info.transports[0] == webauthn.AuthenticatorTransport.INTERNAL
         )
-        assert info.algorithms == cose.CoseKey.supported_algorithms()
+        assert [
+            a["alg"] for a in info.algorithms
+        ] == cose.CoseKey.supported_algorithms()
 
     def test_make_credential_fails_if_cred_in_exclude_list(self):
         excluded_rp_id = 'excluded.rp.com'
@@ -316,7 +318,7 @@ class TestCtapKeyringDevice(unittest.TestCase):
             ),
             CtapMakeCredentialRequest.PUBLIC_KEY_CREDENTIAL_PARAMS_KEY: [
                 PublicKeyCredentialParameters(
-                    PublicKeyCredentialType.PUBLIC_KEY, algorithm
+                    type=PublicKeyCredentialType.PUBLIC_KEY, alg=algorithm
                 )
             ],
         }
@@ -324,7 +326,7 @@ class TestCtapKeyringDevice(unittest.TestCase):
         if excluded_cred_ids:
             req[CtapMakeCredentialRequest.EXCLUDE_LIST_KEY] = [
                 PublicKeyCredentialDescriptor(
-                    PublicKeyCredentialType.PUBLIC_KEY, cred_id
+                    type=PublicKeyCredentialType.PUBLIC_KEY, id=cred_id
                 )
                 for cred_id in excluded_cred_ids
             ]
@@ -357,7 +359,7 @@ class TestCtapKeyringDevice(unittest.TestCase):
         if allowed_cred_ids:
             req[CtapGetAssertionRequest.ALLOW_LIST_KEY] = [
                 PublicKeyCredentialDescriptor(
-                    PublicKeyCredentialType.PUBLIC_KEY, cred_id
+                    type=PublicKeyCredentialType.PUBLIC_KEY, id=cred_id
                 )
                 for cred_id in allowed_cred_ids
             ]

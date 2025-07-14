@@ -157,11 +157,13 @@ class CtapKeyringDevice(ctap.CtapDevice):
             ctap2_req: Mapping[Any, Any] = cbor.decode(data[1:])
         except Exception:
             import traceback
+
             traceback.print_exc()
             raise CtapError(CtapError.ERR.INVALID_CBOR)
 
         if not isinstance(ctap2_req, dict):
             import traceback
+
             traceback.print_exc()
             raise CtapError(CtapError.ERR.INVALID_CBOR)
 
@@ -228,12 +230,15 @@ class CtapKeyringDevice(ctap.CtapDevice):
             # an encoded 2048-bits RSA key would exceed that.
             # The least error-prone, safest overall key to use is a 256-bit (non-Koblitz) elliptic curve (ES256)
             service_name = cls.get_service_name(request.rp.id)
+            import hashlib
+            safe_username = hashlib.sha256(cred.user_id.encode() if isinstance(cred.user_id, str) else cred.user_id).hexdigest()[:32]
             keyring.set_password(
-                service_name=service_name, username=cred.user_id, password=cred.encoded
+                service_name=service_name, username=safe_username, password=cred.encoded
             )
             return cred
         except Exception:
             import traceback
+
             traceback.print_exc()
             raise CtapError(CtapError.ERR.OTHER)
 
@@ -331,6 +336,7 @@ class CtapKeyringDevice(ctap.CtapDevice):
             except Exception:
                 # Best effort
                 import traceback
+
                 traceback.print_exc()
                 continue
 
@@ -360,8 +366,8 @@ class CtapKeyringDevice(ctap.CtapDevice):
         )
         response = AssertionResponse(
             PublicKeyCredentialDescriptor(
-                PublicKeyCredentialType.PUBLIC_KEY,
-                cred.id,
+                type=PublicKeyCredentialType.PUBLIC_KEY,
+                id=cred.id,
                 transports=[webauthn.AuthenticatorTransport.INTERNAL],
             ).__dict__,
             authenticator_data,

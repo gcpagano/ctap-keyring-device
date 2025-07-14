@@ -26,7 +26,12 @@ class CtapCredentialMaker:
         assert user_id
 
         if isinstance(user_id, bytes):
-            user_id = user_id.decode('utf-8')
+            try:
+                user_id = user_id.decode('utf-8')
+            except UnicodeDecodeError:
+                # Handle binary user IDs that aren't valid UTF-8
+                import base64
+                user_id = base64.b64encode(user_id).decode('ascii')
 
         private_key = CtapPrivateKeyWrapper.create(self._cose_key_cls)
         key_password = uuid4().bytes

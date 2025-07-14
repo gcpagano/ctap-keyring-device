@@ -124,12 +124,17 @@ class CtapMakeCredentialRequest:
             user=PublicKeyCredentialUserEntity.from_dict(
                 make_credential_request.get(cls.USER_KEY),
             ),
-            public_key_credential_params=PublicKeyCredentialParameters._deserialize_list(
-                make_credential_request.get(cls.PUBLIC_KEY_CREDENTIAL_PARAMS_KEY)
-            ),
-            exclude_list=PublicKeyCredentialDescriptor._deserialize_list(
-                make_credential_request.get(cls.EXCLUDE_LIST_KEY)
-            ),
+            public_key_credential_params=[
+                PublicKeyCredentialParameters.from_dict(item)
+                for item in (
+                    make_credential_request.get(cls.PUBLIC_KEY_CREDENTIAL_PARAMS_KEY)
+                    or []
+                )
+            ],
+            exclude_list=[
+                PublicKeyCredentialDescriptor.from_dict(item)
+                for item in (make_credential_request.get(cls.EXCLUDE_LIST_KEY) or [])
+            ],
             extensions=make_credential_request.get(cls.EXTENSIONS_KEY),
             options=make_credential_request.get(cls.OPTIONS_KEY),
             pin_auth=make_credential_request.get(cls.PIN_AUTH_KEY),
@@ -177,9 +182,10 @@ class CtapGetAssertionRequest:
         return CtapGetAssertionRequest(
             rp_id=get_assertion_req.get(cls.RP_ID_KEY),
             client_data_hash=get_assertion_req.get(cls.CLIENT_DATA_HASH_KEY),
-            allow_list=PublicKeyCredentialDescriptor._deserialize_list(
-                get_assertion_req.get(cls.ALLOW_LIST_KEY)
-            ),
+            allow_list=[
+                PublicKeyCredentialDescriptor.from_dict(item)
+                for item in (get_assertion_req.get(cls.ALLOW_LIST_KEY) or [])
+            ],
             extensions=get_assertion_req.get(cls.EXTENSIONS_KEY),
             options=get_assertion_req.get(cls.OPTIONS_KEY),
             pin_auth=get_assertion_req.get(cls.PIN_AUTH_KEY),
