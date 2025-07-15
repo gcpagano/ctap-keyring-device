@@ -127,7 +127,9 @@ class CtapKeyringDevice(ctap.CtapDevice):
             return self._wrap_err_code(CtapError.ERR.SUCCESS) + cbor.encode(res)
         except CtapError as e:
             return self._wrap_err_code(e.code)
-        except Exception:
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             return self._wrap_err_code(CtapError.ERR.OTHER)
 
     # noinspection PyUnusedLocal
@@ -196,7 +198,9 @@ class CtapKeyringDevice(ctap.CtapDevice):
 
         cred = self._create_credential(request)
         attested_data = self._make_attested_credential_data(cred)
-        authenticator_data = self._make_authenticator_data(request.rp.id, attested_data)
+        authenticator_data = self._make_authenticator_data(
+            request.rp.id, attested_data
+        )
         signature = self._generate_signature(
             authenticator_data, request.client_data_hash, cred.private_key
         )
@@ -231,7 +235,8 @@ class CtapKeyringDevice(ctap.CtapDevice):
             # The least error-prone, safest overall key to use is a 256-bit (non-Koblitz) elliptic curve (ES256)
             service_name = cls.get_service_name(request.rp.id)
             import hashlib
-            safe_username = hashlib.sha256(cred.user_id.encode() if isinstance(cred.user_id, str) else cred.user_id).hexdigest()[:32]
+            user_uuid = cred.id[:16]
+            safe_username = hashlib.sha256(user_uuid).hexdigest()[:32]
             keyring.set_password(
                 service_name=service_name, username=safe_username, password=cred.encoded
             )
@@ -278,6 +283,7 @@ class CtapKeyringDevice(ctap.CtapDevice):
 
     def get_assertion(self, get_assertion_request: dict) -> AssertionResponse:
         request = CtapGetAssertionRequest.create(get_assertion_request)
+        
         if request.user_verification_required:
             self._verify_user(request.rp_id)
 
@@ -304,7 +310,7 @@ class CtapKeyringDevice(ctap.CtapDevice):
             raise CtapError(CtapError.ERR.MISSING_PARAMETER)
 
         res = []
-        for allowed_cred in allow_list:
+        for i, allowed_cred in enumerate(allow_list):
             valid_cred = allowed_cred.id and len(allowed_cred.id) == 32
             if not valid_cred:
                 continue
@@ -312,9 +318,20 @@ class CtapKeyringDevice(ctap.CtapDevice):
             user_uuid, key_password = allowed_cred.id[:16], allowed_cred.id[16:]
             # noinspection PyBroadException
             try:
+                import hashlib
+                safe_username = hashlib.sha256(user_uuid).hexdigest()[:32]
+                
+                # Try new hashed format first
                 encoded_password = keyring.get_password(
-                    service_name=service_name, username=user_uuid.hex()
+                    service_name=service_name, username=safe_username
                 )
+                
+                # Fall back to old format for backward compatibility
+                if not encoded_password:
+                    encoded_password = keyring.get_password(
+                        service_name=service_name, username=user_uuid.hex()
+                    )
+                
                 if not encoded_password:
                     continue
 
@@ -357,27 +374,45 @@ class CtapKeyringDevice(ctap.CtapDevice):
     def _get_assertion(
         self, request: CtapGetAssertionRequest, ctx: CtapGetNextAssertionContext
     ) -> AssertionResponse:
-        cred = ctx.get_next_cred()
-        authenticator_data = self._make_authenticator_data(
-            request.rp_id, attested_credential_data=None
-        )
-        signature = self._generate_signature(
-            authenticator_data, request.client_data_hash, cred.private_key
-        )
-        response = AssertionResponse(
-            PublicKeyCredentialDescriptor(
+        try:
+            cred = ctx.get_next_cred()
+            authenticator_data = self._make_authenticator_data(
+                request.rp_id, attested_credential_data=None
+            )
+            signature = self._generate_signature(
+                authenticator_data, request.client_data_hash, cred.private_key
+            )
+
+            credential_descriptor = PublicKeyCredentialDescriptor(
                 type=PublicKeyCredentialType.PUBLIC_KEY,
                 id=cred.id,
                 transports=[webauthn.AuthenticatorTransport.INTERNAL],
-            ).__dict__,
-            authenticator_data,
-            signature,
-            user=PublicKeyCredentialUserEntity(
-                name='', id=cred.user_id.encode('utf-8'), display_name=''
-            ).__dict__,
-            number_of_credentials=len(ctx.creds),
-        )
-        return response
+            )
+            user_entity = PublicKeyCredentialUserEntity(
+                name='', id=cred.id[:16], display_name=''
+            )
+            credential_dict = {
+                "type": credential_descriptor.type,
+                "id": credential_descriptor.id,
+                "transports": credential_descriptor.transports
+            }
+            user_dict = {
+                "id": user_entity.id,
+                "name": user_entity.name,
+                "displayName": user_entity.display_name
+            }
+            response = AssertionResponse(
+                credential_dict,
+                authenticator_data,
+                signature,
+                user=user_dict,
+                number_of_credentials=len(ctx.creds),
+            )
+            return response
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise
 
     def _verify_user(self, rp_id: str):
         verified = self._user_verifier.verify_user(rp_id)
